@@ -1,0 +1,7 @@
+node_modules
+.next
+prisma/dev.db*
+.env
+
+# local helper docs
+public/images/README.txt

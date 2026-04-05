@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum ListingStatus {
+  PENDING_DEPOSIT
+  IN_CUSTODY
+  ACTIVE
+  RESERVED
+  SOLD
+  REMOVED
+}
+
+enum OrderStatus {
+  CREATED
+  PAID
+  AWAITING_SELLER
+  IN_DELIVERY
+  TRADE_HOLD
+  DELIVERED
+  CANCELED
+  DISPUTED
+}
+
+enum PayoutStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum DepositStatus {
+  AWAITING_SELLER
+  OFFER_SENT
+  RECEIVED
+  FAILED
+}
+
+enum CustodyStatus {
+  AWAITING_DEPOSIT
+  RECEIVED
+  LISTED
+  RESERVED
+  SENT_TO_BUYER
+  COMPLETED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  OFFER_SENT
+  ACCEPTED
+  FAILED
+}
+
+model User {
+  id             String    @id @default(cuid())
+  walletAddress  String    @unique
+  displayName    String?
+  steamTradeLink String?
+  steamProfile   String?
+  createdAt      DateTime  @default(now())
+  listings       Listing[]
+  buyOrders      Order[]   @relation("BuyerOrders")
+  sellOrders     Order[]   @relation("SellerOrders")
+  payouts        Payout[]
+}
+
+model Listing {
+  id           String        @id @default(cuid())
+  sellerId     String
+  seller       User          @relation(fields: [sellerId], references: [id])
+  itemName     String
+  game         String
+  imageUrl     String?
+  priceUsdc    Float
+  steamAssetId String?
+  status       ListingStatus @default(PENDING_DEPOSIT)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  orders       Order[]
+  deposit      Deposit?
+  custodyItem  CustodyItem?
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  buyerId       String
+  sellerId      String
+  listingId     String
+  buyer         User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller        User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  listing       Listing     @relation(fields: [listingId], references: [id])
+  amountUsdc    Float
+  paymentTxHash String?
+  status        OrderStatus @default(CREATED)
+  holdUntil     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  payout        Payout?
+  withdrawal    Withdrawal?
+}
+
+model Payout {
+  id           String       @id @default(cuid())
+  orderId      String       @unique
+  sellerId     String
+  order        Order        @relation(fields: [orderId], references: [id])
+  seller       User         @relation(fields: [sellerId], references: [id])
+  amountUsdc   Float
+  payoutTxHash String?
+  status       PayoutStatus @default(PENDING)
+  createdAt    DateTime     @default(now())
+}
+
+model Bot {
+  id              String        @id @default(cuid())
+  steamAccount    String        @unique
+  displayName     String
+  status          String        @default("ONLINE")
+  inventoryCap    Int           @default(200)
+  createdAt       DateTime      @default(now())
+  deposits        Deposit[]
+  custodyItems    CustodyItem[]
+  withdrawals     Withdrawal[]
+}
+
+model Deposit {
+  id            String        @id @default(cuid())
+  listingId     String        @unique
+  botId         String
+  tradeOfferId  String?
+  status        DepositStatus @default(AWAITING_SELLER)
+  receivedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  bot           Bot           @relation(fields: [botId], references: [id])
+}
+
+model CustodyItem {
+  id            String        @id @default(cuid())
+  listingId      String        @unique
+  botId          String
+  steamAssetId   String?
+  custodyStatus  CustodyStatus @default(AWAITING_DEPOSIT)
+  createdAt      DateTime      @default(now())
+  listing        Listing       @relation(fields: [listingId], references: [id])
+  bot            Bot           @relation(fields: [botId], references: [id])
+  withdrawal     Withdrawal?
+}
+
+model Withdrawal {
+  id            String           @id @default(cuid())
+  orderId        String           @unique
+  custodyItemId  String           @unique
+  botId          String
+  tradeOfferId   String?
+  status         WithdrawalStatus @default(PENDING)
+  sentAt         DateTime?
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  order          Order            @relation(fields: [orderId], references: [id])
+  custodyItem    CustodyItem      @relation(fields: [custodyItemId], references: [id])
+  bot            Bot              @relation(fields: [botId], references: [id])
+}
