@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARC Skins Market</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-logo">A</div>
+          <div>
+            <div class="top-label">ARC MARKETPLACE</div>
+            <div class="brand-title">CS Skins Exchange</div>
+          </div>
+        </div>
+
+        <div class="top-nav">
+          <button class="nav-btn active">Маркет</button>
+          <button class="nav-btn">Обмен</button>
+          <button class="nav-btn">Инвентарь</button>
+          <button class="nav-btn">Офферы</button>
+        </div>
+
+        <div class="wallet-box">
+          <div id="account-summary"></div>
+          <button class="wallet-btn">Подключить ARC Wallet</button>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <aside class="filters-panel panel">
+          <div class="panel-head">
+            <div>
+              <div class="top-label">поиск и фильтры</div>
+              <h2>Каталог</h2>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Поиск предмета</span>
+            <input id="search-input" type="text" placeholder="Например: AK-47 | Redline, нож, кейс, перчатки" />
+          </label>
+
+          <div class="filter-group">
+            <div class="group-title">Тип предмета</div>
+            <div class="chips">
+              <button class="chip active" data-type="all">Все</button>
+              <button class="chip" data-type="skin">Скины</button>
+              <button class="chip" data-type="knife">Ножи</button>
+              <button class="chip" data-type="gloves">Перчатки</button>
+              <button class="chip" data-type="case">Кейсы</button>
+              <button class="chip" data-type="sticker">Стикеры</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="group-title">Тип сделки</div>
+            <div class="chips">
+              <button class="chip active">Купить сейчас</button>
+              <button class="chip">Офферы</button>
+              <button class="chip">Обмен</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="group-title">Float / wear</div>
+            <div class="range-row">
+              <input type="number" value="0.00" step="0.01" />
+              <input type="number" value="1.00" step="0.01" />
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="group-title">Цена</div>
+            <div class="range-row">
+              <input type="number" value="0" step="1" />
+              <input type="number" value="5000" step="1" />
+            </div>
+          </div>
+
+          <button class="apply-btn">Применить фильтры</button>
+        </aside>
+
+        <section class="market-area">
+          <section class="hero panel">
+            <div>
+              <div class="top-label">p2p skins marketplace</div>
+              <h1 id="market-title">Маркет скинов CS2</h1>
+              <p id="market-subtitle">
+                Поиск по предметам, демо-лоты, офферы и будущий ARC marketplace без лишней выдуманной логики.
+              </p>
+            </div>
+            <div class="hero-stats">
+              <div class="stat-box">
+                <span>Активных лотов</span>
+                <strong id="active-count">—</strong>
+              </div>
+              <div class="stat-box">
+                <span>Демо floor</span>
+                <strong id="floor-price">—</strong>
+              </div>
+              <div class="stat-box">
+                <span>Газ</span>
+                <strong>USDC</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="toolbar-row panel">
+            <div class="toolbar-left">
+              <button class="sort-btn active">Популярные</button>
+              <button class="sort-btn">Дешевле сначала</button>
+              <button class="sort-btn">Дороже сначала</button>
+              <button class="sort-btn">Новые листинги</button>
+            </div>
+            <div class="toolbar-right">
+              <button class="view-btn active">Сетка</button>
+              <button class="view-btn">Список</button>
+            </div>
+          </section>
+
+          <section id="skins-grid" class="skins-grid"></section>
+        </section>
+
+        <aside class="trade-panel panel">
+          <div class="panel-head">
+            <div>
+              <div class="top-label">быстрое действие</div>
+              <h2>Карточка предмета</h2>
+            </div>
+          </div>
+
+          <div class="selected-card" id="selected-card">
+            <div class="skin-preview"></div>
+            <div>
+              <div class="selected-name" id="selected-name">Выбери предмет</div>
+              <div class="selected-meta" id="selected-meta">Цена, тип, продавец, статус escrow</div>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Действие</span>
+            <select id="side">
+              <option value="long">Купить сейчас</option>
+              <option value="short">Сделать оффер</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Количество</span>
+            <input id="size" type="number" min="1" step="1" value="1" />
+          </label>
+
+          <label class="field">
+            <span>Цена / оффер</span>
+            <input id="leverage" type="number" min="1" max="999999" step="1" value="150" />
+          </label>
+
+          <div class="deal-summary">
+            <div><span>Сеть</span><strong>ARC</strong></div>
+            <div><span>Расчёт</span><strong>P2P / escrow</strong></div>
+            <div><span>Газ</span><strong>USDC</strong></div>
+          </div>
+
+          <button id="submit-order" class="primary-btn">Подтвердить действие</button>
+          <button class="secondary-btn">Открыть страницу предмета</button>
+          <button class="secondary-btn">Добавить в избранное</button>
+        </aside>
+      </main>
+
+      <section class="bottom-section">
+        <section class="panel table-panel">
+          <div class="panel-head">
+            <div>
+              <div class="top-label">мои данные</div>
+              <h2>Последние действия</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="orders-table">
+              <thead>
+                <tr><th>Время</th><th>Предмет</th><th>Действие</th><th>Кол-во</th><th>Цена</th><th>Статус</th><th>Комментарий</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="panel-head">
+            <div>
+              <div class="top-label">тех. блок</div>
+              <h2>Служебные данные стенда</h2>
+            </div>
+            <div class="sim-buttons">
+              <button id="tick-up">Тик вверх</button>
+              <button id="tick-down">Тик вниз</button>
+              <button id="tick-flat">Случайный тик</button>
+              <button id="reset">Сброс</button>
+            </div>
+          </div>
+          <div class="table-wrap compact">
+            <table id="prices-table">
+              <thead><tr><th>Время</th><th>Цена</th><th>Объём</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

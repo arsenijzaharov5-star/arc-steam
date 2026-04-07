@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#181727"/>
+      <stop offset="100%" stop-color="#0d1019"/>
+    </linearGradient>
+    <linearGradient id="bladeL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7b6fff"/>
+      <stop offset="100%" stop-color="#f25fd7"/>
+    </linearGradient>
+    <linearGradient id="bladeR" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffcf72"/>
+      <stop offset="100%" stop-color="#ff8f57"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="46" y="46" width="1108" height="708" rx="34" fill="#121722" stroke="#2b3548"/>
+  <text x="90" y="136" fill="#eef3ff" font-size="54" font-family="Arial" font-weight="700">Butterfly Knife | Fade</text>
+  <text x="90" y="184" fill="#ffc973" font-size="24" font-family="Arial">Factory New · Covert Knife · CS2</text>
+  <g filter="url(#shadow)" transform="translate(450 245)">
+    <path d="M118 28 C190 58, 230 137, 205 248 C161 214, 132 164, 104 106 Z" fill="url(#bladeR)"/>
+    <path d="M118 28 C44 58, 6 137, 31 248 C75 214, 104 164, 132 106 Z" fill="url(#bladeL)"/>
+    <rect x="104" y="220" width="28" height="180" rx="12" fill="#d6dcef"/>
+    <rect x="74" y="250" width="18" height="150" rx="9" fill="#3f4b63"/>
+    <rect x="144" y="250" width="18" height="150" rx="9" fill="#3f4b63"/>
+  </g>
+  <rect x="90" y="640" width="160" height="44" rx="22" fill="#1b2434" stroke="#39455b"/>
+  <text x="142" y="668" fill="#ffd19b" font-size="22" font-family="Arial" font-weight="700">FADE</text>
+</svg>
