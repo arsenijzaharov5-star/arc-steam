@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
+import random
 import urllib.request
+from collections import defaultdict
 from pathlib import Path
 
 BASE = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en"
@@ -118,21 +120,43 @@ preferred_weapons = [
     "AK-47", "M4A1-S", "M4A4", "AWP", "USP-S", "Glock-18", "Desert Eagle", "MAC-10", "FAMAS", "Galil AR"
 ]
 
-weapon_skins.sort(key=lambda x: (
-    0 if x["weapon"] in preferred_weapons else 1,
-    preferred_weapons.index(x["weapon"]) if x["weapon"] in preferred_weapons else 999,
-    x["name"]
-))
+random.seed(42)
 
-knives_gloves.sort(key=lambda x: (0 if x["type"] == "knife" else 1, x["name"]))
+weapon_buckets = defaultdict(list)
+for row in weapon_skins:
+    weapon_buckets[row["weapon"]].append(row)
 
-for row in weapon_skins[:220]:
+for rows in weapon_buckets.values():
+    rows.sort(key=lambda x: x["name"])
+
+selected_weapon_skins = []
+round_weapons = preferred_weapons + sorted([w for w in weapon_buckets.keys() if w not in preferred_weapons])
+while len(selected_weapon_skins) < 220 and round_weapons:
+    progressed = False
+    for weapon in round_weapons:
+        bucket = weapon_buckets.get(weapon) or []
+        if not bucket:
+            continue
+        selected_weapon_skins.append(bucket.pop(0))
+        progressed = True
+        if len(selected_weapon_skins) >= 220:
+            break
+    if not progressed:
+        break
+
+knives = [x for x in knives_gloves if x["type"] == "knife"]
+gloves = [x for x in knives_gloves if x["type"] == "gloves"]
+knives.sort(key=lambda x: x["name"])
+gloves.sort(key=lambda x: x["name"])
+selected_knives_gloves = knives[:45] + gloves[:35]
+
+for row in selected_weapon_skins:
     if row["name"] in seen:
         continue
     seen.add(row["name"])
     catalog.append(row)
 
-for row in knives_gloves[:80]:
+for row in selected_knives_gloves:
     if row["name"] in seen:
         continue
     seen.add(row["name"])
@@ -176,12 +200,12 @@ for row in crate_rows:
     seen.add(row["name"])
     catalog.append(row)
 
+sticker_rows = []
 for s in stickers:
     name = s.get("name")
     if not name or name in seen or not s.get("market_hash_name"):
         continue
-    seen.add(name)
-    catalog.append({
+    sticker_rows.append({
         "id": s.get("id"),
         "name": name,
         "type": "sticker",
@@ -192,8 +216,30 @@ for s in stickers:
         "image": s.get("image"),
         "marketHashName": s.get("market_hash_name"),
     })
-    if len([x for x in catalog if x["type"] == "sticker"]) >= 60:
+    if len(sticker_rows) >= 60:
         break
 
-OUT.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
-print(f"WROTE {len(catalog)} items to {OUT}")
+for row in sticker_rows:
+    if row["name"] in seen:
+        continue
+    seen.add(row["name"])
+    catalog.append(row)
+
+# Interleave for mixed storefront ordering: skin, knife, case, sticker, etc.
+def split_rows(rows, kind):
+    return [r for r in rows if r["type"] == kind]
+
+skins_final = split_rows(catalog, "skin")
+knives_final = split_rows(catalog, "knife")
+gloves_final = split_rows(catalog, "gloves")
+cases_final = split_rows(catalog, "case")
+stickers_final = split_rows(catalog, "sticker")
+
+mixed = []
+while any([skins_final, knives_final, gloves_final, cases_final, stickers_final]):
+    for bucket in (skins_final, knives_final, cases_final, stickers_final, gloves_final):
+        if bucket:
+            mixed.append(bucket.pop(0))
+
+OUT.write_text(json.dumps(mixed, ensure_ascii=False, indent=2), encoding="utf-8")
+print(f"WROTE {len(mixed)} items to {OUT}")
