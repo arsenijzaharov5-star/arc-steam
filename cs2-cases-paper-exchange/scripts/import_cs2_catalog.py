@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 import json
-import random
 import urllib.request
-from collections import defaultdict
 from pathlib import Path
 
 BASE = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en"
-OUT = Path("/root/.openclaw/workspace/cs2-cases-paper-exchange/public/data/items.json")
-OUT.parent.mkdir(parents=True, exist_ok=True)
+DATA_DIR = Path("/root/.openclaw/workspace/cs2-cases-paper-exchange/public/data")
+OUT = DATA_DIR / "items.json"
+ASSETS_OUT = DATA_DIR / "item-assets.json"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 URLS = {
     "skins": f"{BASE}/skins_not_grouped.json",
@@ -17,7 +17,7 @@ URLS = {
 
 
 def fetch_json(url: str):
-    with urllib.request.urlopen(url, timeout=60) as resp:
+    with urllib.request.urlopen(url, timeout=120) as resp:
         return json.load(resp)
 
 
@@ -51,20 +51,6 @@ def safe_price(name: str, t: str, wear: str = "") -> float:
         return 2460.0
     if "sport gloves" in n or "pandora" in n or "vice" in n:
         return 2250.0 if "vice" in n else 9700.0
-    if "glock-18 | fade" in n:
-        return 690.0
-    if "desert eagle | blaze" in n:
-        return 640.0
-    if "m4a1-s | printstream" in n:
-        return 78.0
-    if "awp | asiimov" in n:
-        return 54.5
-    if "ak-47 | redline" in n:
-        return 16.9
-    if "ak-47 | vulcan" in n:
-        return 258.0
-    if "usp-s | kill confirmed" in n:
-        return 124.0
     if t == "knife":
         return 1800.0
     if t == "gloves":
@@ -82,164 +68,112 @@ def item_type_from_category(cat_name: str, name: str):
     return "skin"
 
 
+def rarity_payload(raw):
+    if not raw:
+        return {"name": "Consumer Grade", "color": "#b0c3d9"}
+    return {
+        "name": raw.get("name") or "Consumer Grade",
+        "color": raw.get("color") or "#b0c3d9",
+    }
+
+
 skins = fetch_json(URLS["skins"])
 crates = fetch_json(URLS["crates"])
 stickers = fetch_json(URLS["stickers"])
 
 catalog = []
+assets = []
 seen = set()
 
-weapon_skins = []
-knives_gloves = []
-
 for s in skins:
-    name = s.get("name")
+    name = s.get("market_hash_name") or s.get("name")
     if not name or name in seen:
         continue
     wear = (s.get("wear") or {}).get("name", "—")
     weapon = (s.get("weapon") or {}).get("name", "Item")
-    category_name = (s.get("category") or {}).get("name", "")
+    category_name = (s.get("category") or {}).get("name", "Skin")
     item_type = item_type_from_category(category_name, name)
-    row = {
+    rarity = rarity_payload(s.get("rarity"))
+    pattern = (s.get("pattern") or {}).get("name") or ""
+    entry = {
         "id": s.get("id"),
         "name": name,
         "type": item_type,
         "weapon": weapon,
         "wear": wear,
+        "category": category_name,
+        "rarity": rarity,
+        "pattern": pattern,
         "priceUsdc": safe_price(name, item_type, wear),
         "seller": "demo.market",
         "image": s.get("image"),
-        "marketHashName": s.get("market_hash_name"),
+        "marketHashName": s.get("market_hash_name") or name,
     }
-    if item_type == "skin":
-        weapon_skins.append(row)
-    else:
-        knives_gloves.append(row)
+    catalog.append(entry)
+    assets.append({
+        "id": entry["id"],
+        "name": entry["name"],
+        "type": entry["type"],
+        "category": entry["category"],
+        "rarity": rarity,
+        "image": entry["image"],
+        "marketHashName": entry["marketHashName"],
+    })
+    seen.add(name)
 
-preferred_weapons = [
-    "AK-47", "M4A1-S", "M4A4", "AWP", "USP-S", "Glock-18", "Desert Eagle", "MAC-10", "FAMAS", "Galil AR"
-]
-
-random.seed(42)
-
-weapon_buckets = defaultdict(list)
-for row in weapon_skins:
-    weapon_buckets[row["weapon"]].append(row)
-
-for rows in weapon_buckets.values():
-    rows.sort(key=lambda x: x["name"])
-
-selected_weapon_skins = []
-round_weapons = preferred_weapons + sorted([w for w in weapon_buckets.keys() if w not in preferred_weapons])
-while len(selected_weapon_skins) < 220 and round_weapons:
-    progressed = False
-    for weapon in round_weapons:
-        bucket = weapon_buckets.get(weapon) or []
-        if not bucket:
-            continue
-        selected_weapon_skins.append(bucket.pop(0))
-        progressed = True
-        if len(selected_weapon_skins) >= 220:
-            break
-    if not progressed:
-        break
-
-knives = [x for x in knives_gloves if x["type"] == "knife"]
-gloves = [x for x in knives_gloves if x["type"] == "gloves"]
-knives.sort(key=lambda x: x["name"])
-gloves.sort(key=lambda x: x["name"])
-selected_knives_gloves = knives[:45] + gloves[:35]
-
-for row in selected_weapon_skins:
-    if row["name"] in seen:
-        continue
-    seen.add(row["name"])
-    catalog.append(row)
-
-for row in selected_knives_gloves:
-    if row["name"] in seen:
-        continue
-    seen.add(row["name"])
-    catalog.append(row)
-
-preferred_case_names = [
-    "CS:GO Weapon Case", "Operation Bravo Case", "CS:GO Weapon Case 2", "CS:GO Weapon Case 3",
-    "Winter Offensive Weapon Case", "eSports 2013 Case", "eSports 2013 Winter Case", "Operation Phoenix Weapon Case",
-    "Huntsman Weapon Case", "Operation Breakout Weapon Case", "Falchion Case", "Shadow Case", "Revolver Case",
-    "Operation Wildfire Case", "Chroma Case", "Chroma 2 Case", "Chroma 3 Case", "Gamma Case", "Gamma 2 Case",
-    "Spectrum Case", "Spectrum 2 Case", "Glove Case", "Clutch Case", "Prisma Case", "Prisma 2 Case",
-    "Danger Zone Case", "Horizon Case", "Operation Hydra Case", "Shattered Web Case", "Fracture Case",
-    "Snakebite Case", "Operation Broken Fang Case", "Operation Riptide Case", "Dreams & Nightmares Case",
-    "Recoil Case", "Revolution Case", "Kilowatt Case", "CS20 Case", "Gallery Case"
-]
-
-crate_rows = []
 for c in crates:
-    name = c.get("name")
+    name = c.get("market_hash_name") or c.get("name")
     if not name or name in seen:
         continue
     lower = name.lower()
     if "case" not in lower:
         continue
-    crate_rows.append({
+    rarity = {"name": "Container", "color": "#e4ae39"}
+    entry = {
         "id": c.get("id"),
         "name": name,
         "type": "case",
         "weapon": "Case",
         "wear": "—",
+        "category": "Case",
+        "rarity": rarity,
+        "pattern": "",
         "priceUsdc": safe_price(name, "case"),
         "seller": "demo.market",
         "image": c.get("image"),
-        "marketHashName": c.get("market_hash_name"),
-    })
+        "marketHashName": c.get("market_hash_name") or name,
+    }
+    catalog.append(entry)
+    assets.append({k: entry[k] for k in ["id", "name", "type", "category", "rarity", "image", "marketHashName"]})
+    seen.add(name)
 
-crate_rows.sort(key=lambda x: (0 if x["name"] in preferred_case_names else 1, preferred_case_names.index(x["name"]) if x["name"] in preferred_case_names else 999, x["name"]))
-for row in crate_rows:
-    if row["name"] in seen:
-        continue
-    seen.add(row["name"])
-    catalog.append(row)
-
-sticker_rows = []
 for s in stickers:
-    name = s.get("name")
+    name = s.get("market_hash_name") or s.get("name")
     if not name or name in seen or not s.get("market_hash_name"):
         continue
-    sticker_rows.append({
+    rarity = rarity_payload(s.get("rarity"))
+    entry = {
         "id": s.get("id"),
         "name": name,
         "type": "sticker",
         "weapon": "Sticker",
         "wear": "—",
+        "category": "Sticker",
+        "rarity": rarity,
+        "pattern": "",
         "priceUsdc": safe_price(name, "sticker"),
         "seller": "demo.market",
         "image": s.get("image"),
         "marketHashName": s.get("market_hash_name"),
-    })
-    if len(sticker_rows) >= 60:
-        break
+    }
+    catalog.append(entry)
+    assets.append({k: entry[k] for k in ["id", "name", "type", "category", "rarity", "image", "marketHashName"]})
+    seen.add(name)
 
-for row in sticker_rows:
-    if row["name"] in seen:
-        continue
-    seen.add(row["name"])
-    catalog.append(row)
+catalog.sort(key=lambda x: (x["weapon"], x["name"]))
+assets.sort(key=lambda x: x["name"])
 
-# Interleave for mixed storefront ordering: skin, knife, case, sticker, etc.
-def split_rows(rows, kind):
-    return [r for r in rows if r["type"] == kind]
-
-skins_final = split_rows(catalog, "skin")
-knives_final = split_rows(catalog, "knife")
-gloves_final = split_rows(catalog, "gloves")
-cases_final = split_rows(catalog, "case")
-stickers_final = split_rows(catalog, "sticker")
-
-mixed = []
-while any([skins_final, knives_final, gloves_final, cases_final, stickers_final]):
-    for bucket in (skins_final, knives_final, cases_final, stickers_final, gloves_final):
-        if bucket:
-            mixed.append(bucket.pop(0))
-
-OUT.write_text(json.dumps(mixed, ensure_ascii=False, indent=2), encoding="utf-8")
-print(f"WROTE {len(mixed)} items to {OUT}")
+OUT.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
+ASSETS_OUT.write_text(json.dumps(assets, ensure_ascii=False, indent=2), encoding="utf-8")
+print(f"WROTE {len(catalog)} items to {OUT}")
+print(f"WROTE {len(assets)} assets to {ASSETS_OUT}")
