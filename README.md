@@ -4,7 +4,7 @@ MVP for a cs.money-like Steam items marketplace with Arc-native USDC settlement.
 
 ## Included in this first scaffold
 - Next.js app router project
-- Prisma schema (SQLite for local dev)
+- Prisma schema
 - Landing page
 - Marketplace page
 - Listing detail page
@@ -20,15 +20,6 @@ MVP for a cs.money-like Steam items marketplace with Arc-native USDC settlement.
 - Orders are created on-site
 - Delivery happens offchain via Steam trade
 - Payouts happen after fulfillment
-
-## Run locally
-
-```bash
-npm install
-npx prisma generate
-npx prisma db push
-npm run dev
-```
 
 ## Next steps
 1. Add wallet connect
