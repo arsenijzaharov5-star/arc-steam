@@ -25,6 +25,7 @@ const navBtnEls = Array.from(document.querySelectorAll(".nav-btn[data-view]"));
 const sortBtnEls = Array.from(document.querySelectorAll(".sort-btn[data-sort]"));
 const marketViewEl = document.getElementById("market-view");
 const inventoryViewEl = document.getElementById("inventory-view");
+const profileViewEl = document.getElementById("profile-view");
 const walletStatusEl = document.getElementById("wallet-status");
 const connectWalletBtnEl = document.getElementById("connect-wallet-btn");
 const walletModalEl = document.getElementById("wallet-modal");
@@ -36,10 +37,21 @@ const modalItemMetaEl = document.getElementById("modal-item-meta");
 const modalQtyEl = document.getElementById("modal-qty");
 const modalPriceEl = document.getElementById("modal-price");
 const modalConfirmEl = document.getElementById("modal-confirm");
+const paymentStatusEl = document.getElementById("payment-status");
 const primaryItemActionEl = document.getElementById("primary-item-action");
 const secondaryItemActionEl = document.getElementById("secondary-item-action");
 const tertiaryItemActionEl = document.getElementById("tertiary-item-action");
 const resultsCountEl = document.getElementById("results-count");
+const profileSteamIdEl = document.getElementById("profile-steam-id");
+const profileSteamNameEl = document.getElementById("profile-steam-name");
+const profileTradeLinkEl = document.getElementById("profile-trade-link");
+const profileSaveBtnEl = document.getElementById("profile-save-btn");
+const profileConnectSteamBtnEl = document.getElementById("profile-connect-steam-btn");
+const profileStatusEl = document.getElementById("profile-status");
+const profileWalletStateEl = document.getElementById("profile-wallet-state");
+const profileSteamStateEl = document.getElementById("profile-steam-state");
+const profileTradeStateEl = document.getElementById("profile-trade-state");
+const profileHistoryEl = document.getElementById("profile-history");
 const resultsNoteEl = document.getElementById("results-note");
 const loadMoreBtnEl = document.getElementById("load-more-btn");
 const catalogFooterTextEl = document.getElementById("catalog-footer-text");
@@ -56,16 +68,32 @@ let currentView = "market";
 let connectedWallet = null;
 let currentSort = "popular";
 let marketRenderLimit = 48;
+let profileState = null;
+let currentPurchaseOrder = null;
+
+function persistWallet(address) {
+  try {
+    if (address) localStorage.setItem("arc_wallet_address", address);
+    else localStorage.removeItem("arc_wallet_address");
+  } catch {}
+}
+
+function loadPersistedWallet() {
+  try {
+    return localStorage.getItem("arc_wallet_address");
+  } catch {
+    return null;
+  }
+}
 
 const INVENTORY_LIMIT = 24;
 const MARKET_PAGE_SIZE = 48;
-const MAX_MARKET_RENDER = 240;
 
 const ARC_NETWORK = {
-  chainIdHex: "0x4cf7f2",
+  chainIdHex: "0x4cef52",
   chainIdDec: 5042002,
   chainName: "Arc Testnet",
-  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 6 },
   rpcUrls: [
     "https://rpc.testnet.arc.network",
     "https://rpc.blockdaemon.testnet.arc.network",
@@ -74,6 +102,91 @@ const ARC_NETWORK = {
   ],
   blockExplorerUrls: ["https://testnet.arcscan.app"]
 };
+
+function isTradeVerified() {
+  return Boolean(profileState?.steamId && profileState?.steamTradeLink && Number(profileState?.tradeLinkVerified || 0) === 1);
+}
+
+function updateProfileSummary() {
+  if (profileWalletStateEl) {
+    profileWalletStateEl.textContent = connectedWallet ? `${connectedWallet.slice(0, 6)}...${connectedWallet.slice(-4)}` : "Not connected";
+  }
+  if (profileSteamStateEl) {
+    profileSteamStateEl.textContent = profileState?.steamId ? (profileState.steamName || profileState.steamId) : "Not connected";
+  }
+  if (profileTradeStateEl) {
+    profileTradeStateEl.textContent = isTradeVerified() ? "Verified" : "Not verified";
+  }
+  if (profileStatusEl) {
+    profileStatusEl.textContent = isTradeVerified()
+      ? "Steam profile verified. Trading is unlocked."
+      : profileState?.steamId
+        ? "Steam connected. Add a valid trade link to unlock trading."
+        : "Steam profile not verified. Buying and selling are blocked.";
+    profileStatusEl.classList.toggle("verified", isTradeVerified());
+  }
+}
+
+async function loadProfile() {
+  profileState = await api.get("/api/profile").catch(() => null);
+  if (profileState?.steamId && !profileState?.steamName) {
+    profileState.steamName = `Steam ${profileState.steamId.slice(-6)}`;
+  }
+  if (profileSteamIdEl) profileSteamIdEl.value = profileState?.steamId || "";
+  if (profileSteamNameEl) profileSteamNameEl.value = profileState?.steamName || "";
+  if (profileTradeLinkEl) profileTradeLinkEl.value = profileState?.steamTradeLink || "";
+  if (profileHistoryEl) {
+    const orders = await api.get("/api/orders?limit=8").catch(() => []);
+    profileHistoryEl.innerHTML = orders.length
+      ? orders.map((order) => `${order.symbol} · ${order.side} · ${fmt(order.price)} USDC · ${order.status}`).join("<br />")
+      : "No purchase/sale history yet.";
+  }
+  updateProfileSummary();
+}
+
+async function saveProfile() {
+  const steamId = (profileSteamIdEl?.value?.trim() || profileState?.steamId || "");
+  const steamName = (profileSteamNameEl?.value?.trim() || profileState?.steamName || "");
+  const steamTradeLink = profileTradeLinkEl?.value?.trim();
+
+  if (!steamId || !steamName) {
+    alert("Connect Steam first.");
+    return;
+  }
+  if (!steamTradeLink) {
+    alert("Fill Steam trade link first.");
+    return;
+  }
+
+  const result = await fetch("/api/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ steamId, steamName, steamTradeLink })
+  });
+
+  const data = await result.json();
+  if (!result.ok) {
+    alert(data.error || "Could not save profile");
+    return;
+  }
+
+  profileState = data;
+  updateProfileSummary();
+}
+
+function ensureTradingUnlocked() {
+  if (!connectedWallet) {
+    alert("Connect ARC wallet first.");
+    openWalletModal();
+    return false;
+  }
+  if (!isTradeVerified()) {
+    alert("Complete Profile and verify your Steam trade link before buying or selling.");
+    switchView("profile");
+    return false;
+  }
+  return true;
+}
 
 function fmt(n) {
   const x = Number(n ?? 0);
@@ -126,47 +239,9 @@ function itemKey(item) {
   return `${item.id || item.marketHashName || item.name}`;
 }
 
-function curatedMarketSlice(items) {
+function visibleMarketSlice(items) {
   if (!items.length) return [];
-
-  const targetLimit = Math.min(Math.max(marketRenderLimit, MARKET_PAGE_SIZE), MAX_MARKET_RENDER, items.length);
-  const buckets = {
-    skin: [],
-    knife: [],
-    gloves: [],
-    case: [],
-    sticker: []
-  };
-
-  for (const item of items) {
-    if (buckets[item.type]) buckets[item.type].push(item);
-  }
-
-  const typeOrder = ["skin", "knife", "gloves", "case", "sticker"];
-  const weights = { skin: 0.54, knife: 0.16, gloves: 0.08, case: 0.10, sticker: 0.12 };
-  const selected = [];
-  const used = new Set();
-
-  for (const type of typeOrder) {
-    const take = Math.min(buckets[type].length, Math.max(1, Math.round(targetLimit * weights[type])));
-    for (const item of buckets[type].slice(0, take)) {
-      const key = itemKey(item);
-      if (used.has(key)) continue;
-      selected.push(item);
-      used.add(key);
-      if (selected.length >= targetLimit) return selected;
-    }
-  }
-
-  for (const item of items) {
-    const key = itemKey(item);
-    if (used.has(key)) continue;
-    selected.push(item);
-    used.add(key);
-    if (selected.length >= targetLimit) break;
-  }
-
-  return selected;
+  return items.slice(0, Math.min(marketRenderLimit, items.length));
 }
 
 async function loadFeaturedCatalog() {
@@ -258,7 +333,7 @@ function needsFullCatalog() {
   const q = (searchInputEl?.value || "").trim();
   const minPrice = Number(minPriceEl?.value || 0);
   const maxPrice = Number(maxPriceEl?.value || 0);
-  return Boolean(q) || minPrice > 0 || (Number.isFinite(maxPrice) && maxPrice > 0 && maxPrice < 5000) || marketRenderLimit > MARKET_PAGE_SIZE * 2;
+  return Boolean(q) || minPrice > 0 || (Number.isFinite(maxPrice) && maxPrice > 0 && maxPrice < 5000) || marketRenderLimit > MARKET_PAGE_SIZE;
 }
 
 function filteredItems() {
@@ -286,7 +361,7 @@ function inventoryItems() {
   const inventorySource = fullCatalogLoaded
     ? catalogItems
     : (featuredByType.skin?.length ? featuredByType.skin : activeCatalogSource());
-  const sample = curatedMarketSlice(sortItems(inventorySource))
+  const sample = visibleMarketSlice(sortItems(inventorySource))
     .slice(0, INVENTORY_LIMIT)
     .map((item, idx) => ({ ...item, inventoryStatus: states[idx % states.length] }));
 
@@ -306,16 +381,16 @@ function updateHero(items, renderedCount) {
   if (resultsNoteEl) {
     const prefix = fullCatalogLoaded ? "Full catalog" : "Fast start";
     resultsNoteEl.textContent = items.length > renderedCount
-      ? `${prefix}: showing ${renderedCount} storefront-ready items`
-      : `${prefix}: showing all filtered storefront items`;
+      ? `${prefix}: showing ${renderedCount} items so far`
+      : `${prefix}: showing all filtered items`;
   }
   if (catalogFooterTextEl) {
     catalogFooterTextEl.textContent = items.length > renderedCount
-      ? `Displaying ${renderedCount} of ${items.length.toLocaleString("en-US")} filtered items to keep the storefront fast and readable.`
+      ? `Displaying ${renderedCount} of ${items.length.toLocaleString("en-US")} filtered items. Use Load more to continue through the full catalog.`
       : `Displaying all ${renderedCount.toLocaleString("en-US")} filtered items.`;
   }
   if (loadMoreBtnEl) {
-    loadMoreBtnEl.classList.toggle("hidden-view", items.length <= renderedCount || renderedCount >= MAX_MARKET_RENDER);
+    loadMoreBtnEl.classList.toggle("hidden-view", items.length <= renderedCount);
   }
 }
 
@@ -404,7 +479,7 @@ function bindItemCards(root, items) {
 }
 
 function renderListings(items) {
-  const visibleItems = curatedMarketSlice(items);
+  const visibleItems = visibleMarketSlice(items);
 
   if (!visibleItems.length) {
     skinsGridEl.innerHTML = `
@@ -473,6 +548,13 @@ function renderSelectedItem() {
 }
 
 function openTradeModal(mode, item) {
+  currentPurchaseOrder = null;
+  if (paymentStatusEl) paymentStatusEl.textContent = "No payment created yet.";
+  const tradingModes = ["buy", "offer", "list", "delist", "withdraw"];
+  if (tradingModes.includes(mode) && !ensureTradingUnlocked()) {
+    return;
+  }
+
   modalMode = mode;
   modalItem = item;
 
@@ -541,11 +623,13 @@ async function connectArcWallet() {
     if (!address) throw new Error("Wallet did not return an address");
 
     connectedWallet = address;
+    persistWallet(address);
     const chainId = await window.ethereum.request({ method: "eth_chainId" });
 
     if (chainId?.toLowerCase() === ARC_NETWORK.chainIdHex) {
       setWalletStatus(`ARC: ${address.slice(0, 6)}...${address.slice(-4)}`, true);
       connectWalletBtnEl.textContent = "ARC Wallet connected";
+      updateProfileSummary();
       closeWalletModal();
       return;
     }
@@ -584,6 +668,7 @@ async function connectArcWallet() {
     if (updatedChainId?.toLowerCase() === ARC_NETWORK.chainIdHex) {
       setWalletStatus(`ARC: ${address.slice(0, 6)}...${address.slice(-4)}`, true);
       connectWalletBtnEl.textContent = "ARC Wallet connected";
+      updateProfileSummary();
     } else {
       setWalletStatus("Wallet connected, network is still not ARC", false);
     }
@@ -599,9 +684,13 @@ function switchView(view) {
   navBtnEls.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
   marketViewEl.classList.toggle("hidden-view", view !== "market");
   inventoryViewEl.classList.toggle("hidden-view", view !== "inventory");
+  profileViewEl?.classList.toggle("hidden-view", view !== "profile");
 
   if (view === "inventory") {
     renderInventory();
+  }
+  if (view === "profile") {
+    loadProfile();
   }
   renderSelectedItem();
 }
@@ -666,13 +755,61 @@ inventorySearchEl?.addEventListener("input", renderInventory);
 connectWalletBtnEl?.addEventListener("click", openWalletModal);
 walletConnectMetaMaskEl?.addEventListener("click", connectArcWallet);
 loadMoreBtnEl?.addEventListener("click", async () => {
-  marketRenderLimit = Math.min(marketRenderLimit + MARKET_PAGE_SIZE, MAX_MARKET_RENDER);
+  marketRenderLimit = marketRenderLimit + MARKET_PAGE_SIZE;
   await refreshCatalog(false);
 });
-modalConfirmEl?.addEventListener("click", () => {
+modalConfirmEl?.addEventListener("click", async () => {
   if (!modalItem) return;
+  if (["buy", "offer", "list", "delist", "withdraw"].includes(modalMode) && !ensureTradingUnlocked()) return;
+
+  if (modalMode === "buy") {
+    if (!connectedWallet) {
+      alert("Connect ARC wallet first.");
+      return;
+    }
+
+    const createRes = await fetch("/api/purchase/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId: String(modalItem.id),
+        itemName: modalItem.name,
+        amountUsdc: Number(modalItem.priceUsdc),
+        buyerWallet: connectedWallet
+      })
+    });
+    const order = await createRes.json();
+    if (!createRes.ok) {
+      alert(order.error || "Could not create purchase order");
+      return;
+    }
+
+    currentPurchaseOrder = order;
+    if (paymentStatusEl) {
+      paymentStatusEl.innerHTML = `Order #${order.id} created.<br />Send ${fmt(order.amountUsdc)} USDC to ${order.recipientAddress}.<br />Then paste tx hash.`;
+    }
+
+    const txHash = prompt(`Send ${fmt(order.amountUsdc)} USDC to ${order.recipientAddress} on ARC Testnet, then paste the tx hash here:`);
+    if (!txHash) return;
+
+    const confirmRes = await fetch("/api/purchase/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: order.id, txHash })
+    });
+    const confirmData = await confirmRes.json();
+    if (!confirmRes.ok) {
+      alert(confirmData.error || "Could not confirm payment");
+      return;
+    }
+
+    if (paymentStatusEl) {
+      paymentStatusEl.innerHTML = `Payment submitted.<br />Order #${confirmData.order.id} status: ${confirmData.order.status}.<br />Tx: ${confirmData.order.txHash}`;
+    }
+    return;
+  }
+
   const actionLabel = {
-    buy: "Purchase",
     offer: "Offer",
     list: "Listing",
     delist: "Delist",
@@ -713,8 +850,23 @@ for (const btn of sortBtnEls) {
   });
 }
 
+profileSaveBtnEl?.addEventListener("click", saveProfile);
+profileConnectSteamBtnEl?.addEventListener("click", () => {
+  if (connectedWallet) persistWallet(connectedWallet);
+  window.location.href = "/auth/steam";
+});
+
+const restoredWallet = loadPersistedWallet();
+if (restoredWallet) {
+  connectedWallet = restoredWallet;
+  setWalletStatus(`ARC: ${restoredWallet.slice(0, 6)}...${restoredWallet.slice(-4)}`, true);
+  connectWalletBtnEl.textContent = "ARC Wallet connected";
+}
+
 bindDetailActions();
 await loadFeaturedCatalog();
 await refreshAccount();
+await loadProfile();
 await refreshCatalog(true);
-switchView(currentView);
+updateProfileSummary();
+switchView(window.location.hash === "#profile-view" ? "profile" : currentView);

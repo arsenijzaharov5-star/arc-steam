@@ -20,6 +20,7 @@
         <div class="top-nav">
           <button class="nav-btn active" data-view="market">Market</button>
           <button class="nav-btn" data-view="inventory">Inventory</button>
+          <button class="nav-btn" data-view="profile">Profile</button>
         </div>
 
         <div class="wallet-box">
@@ -154,6 +155,59 @@
         </div>
       </section>
 
+      <section id="profile-view" class="inventory-view hidden-view">
+        <div class="panel inventory-panel profile-panel">
+          <div class="panel-head">
+            <div>
+              <div class="top-label">account center</div>
+              <h2>Profile</h2>
+            </div>
+          </div>
+
+          <div class="profile-grid">
+            <div class="panel profile-card">
+              <div class="selected-name">Steam identity</div>
+              <div class="selected-meta">Connect Steam through OpenID like standard CS2 skin sites, then verify your trade link before buying or selling.</div>
+
+              <button id="profile-connect-steam-btn" class="primary-btn">Connect Steam</button>
+
+              <label class="field">
+                <span>Steam ID64</span>
+                <input id="profile-steam-id" type="text" placeholder="7656119..." readonly />
+              </label>
+
+              <label class="field">
+                <span>Steam display name</span>
+                <input id="profile-steam-name" type="text" placeholder="Kursoedov" readonly />
+              </label>
+
+              <label class="field">
+                <span>Steam trade link</span>
+                <input id="profile-trade-link" type="text" placeholder="https://steamcommunity.com/tradeoffer/new/?partner=..." />
+              </label>
+
+              <button id="profile-save-btn" class="primary-btn">Save and verify</button>
+              <div id="profile-status" class="profile-status">Steam profile not verified</div>
+            </div>
+
+            <div class="panel profile-card">
+              <div class="selected-name">Trading access</div>
+              <div class="deal-summary">
+                <div><span>Wallet</span><strong id="profile-wallet-state">Not connected</strong></div>
+                <div><span>Steam</span><strong id="profile-steam-state">Not connected</strong></div>
+                <div><span>Trade link</span><strong id="profile-trade-state">Not verified</strong></div>
+              </div>
+              <div class="selected-meta">Buying and selling stay blocked until the Steam identity and submitted trade link match.</div>
+            </div>
+
+            <div class="panel profile-card">
+              <div class="selected-name">History</div>
+              <div id="profile-history" class="selected-meta">No activity loaded yet.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div id="wallet-modal" class="modal hidden-view">
         <div class="modal-backdrop" data-close-wallet="1"></div>
         <div class="modal-card panel">
@@ -203,8 +257,9 @@
           <div class="deal-summary">
             <div><span>Network</span><strong>ARC</strong></div>
             <div><span>Gas asset</span><strong>USDC</strong></div>
-            <div><span>Execution</span><strong>Demo escrow</strong></div>
+            <div><span>Execution</span><strong>Buyer-signed payment</strong></div>
           </div>
+          <div id="payment-status" class="selected-meta">No payment created yet.</div>
           <button id="modal-confirm" class="primary-btn">Confirm</button>
         </div>
       </div>

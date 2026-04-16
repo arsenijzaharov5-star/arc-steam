@@ -378,6 +378,28 @@ input, select {
   margin-top: 18px;
 }
 .inventory-panel { padding: 18px; }
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.profile-card {
+  padding: 18px;
+}
+.profile-status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #1a1018;
+  color: #f2d3e3;
+  font-size: 13px;
+}
+.profile-status.verified {
+  border-color: rgba(133, 224, 178, 0.35);
+  background: rgba(133, 224, 178, 0.08);
+  color: #d7ffeb;
+}
 .inventory-toolbar {
   margin-bottom: 16px;
   display: flex;
