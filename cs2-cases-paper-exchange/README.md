@@ -9,14 +9,17 @@
 
 ## Что это сейчас
 
-Текущая версия — это **search-first marketplace demo**, где уже есть:
+Текущая версия — это **search-first marketplace beta**, где уже есть:
 - каталог предметов CS2;
-- реальные image URLs для части каталога из открытого CS2 item dataset;
-- демо‑цены, частично подтянутые из Steam Community Market;
-- витрина карточек скинов, ножей, перчаток, кейсов и стикеров;
-- поиск по названию предмета;
-- фильтрация по типу предмета;
-- подготовленный UI под будущий P2P / escrow flow.
+- ARC wallet connect;
+- Steam OpenID account connection;
+- верификация Steam trade link;
+- Steam inventory sync;
+- отображение Steam prices в inventory и marketplace;
+- grouped / ungrouped режим для кейсов в inventory;
+- оценка общей стоимости Steam inventory;
+- базовый buyer-signed payment flow под USDC settlement;
+- ограничения торговых действий через profile + verification gating.
 
 ## Что внутри репозитория
 
@@ -76,15 +79,15 @@ python3 scripts/update_steam_prices.py
 
 ## Ограничения текущей версии
 
-Важно понимать, что это пока **демо‑слой**, а не завершённый продукт.
+Важно понимать, что это пока **beta‑слой**, а не завершённый продукт.
 
 Сейчас **ещё нет**:
 - настоящих пользовательских листингов;
 - реального escrow/custody исполнения;
-- Steam inventory sync;
-- настоящей торговой логики order flow;
-- auth / wallet ownership proof / profile system;
+- полноценной RPC‑валидации onchain оплат;
+- seller payout flow;
 - production‑уровня moderation и anti‑abuse;
+- завершённого admin/dispute слоя;
 - onchain settlement через ARC mainnet.
 
 ## Почему это выглядит именно так
@@ -96,44 +99,31 @@ python3 scripts/update_steam_prices.py
 - оформить покупку / оффер;
 - дальше перевести это в P2P + escrow + ARC settlement.
 
-## Roadmap
+## Current build
 
-### Phase 1 — Demo storefront
-- [x] Базовая витрина предметов
-- [x] Поиск по названию
-- [x] Фильтры по типу предмета
-- [x] Локальный каталог предметов
-- [x] Реальные image URLs для каталога
-- [x] Частичная подгрузка примерных Steam‑цен
+Что уже внедрено в текущую beta-версию:
+- ARC wallet connect
+- Steam OpenID account connection
+- Steam trade-link verification
+- Profile-based trading restrictions
+- Steam inventory sync
+- Steam price display for inventory and marketplace visibility
+- Group / ungroup inventory view for cases
+- Inventory value estimation
+- Initial buyer-signed USDC payment flow
 
-### Phase 2 — Better marketplace presentation
-- [ ] Пагинация / lazy loading каталога
-- [ ] Улучшенный sorting и featured sections
-- [ ] Отдельные блоки popular / cases / high value / recent
-- [ ] Нормальная карточка предмета / item detail page
-- [ ] Избранное / watchlist
+## Planned next
 
-### Phase 3 — Marketplace logic
-- [ ] Создание demo listings
-- [ ] Demo offers / accept / reject flow
-- [ ] Личный inventory view
-- [ ] My listings / my offers / recent sales
-- [ ] Escrow state machine в демо‑виде
-
-### Phase 4 — ARC integration
-- [ ] Wallet connect
-- [ ] USDC settlement UX
-- [ ] ARC transaction states
-- [ ] Onchain/offchain order lifecycle
-- [ ] События исполнения и payout states
-
-### Phase 5 — Production readiness
-- [ ] Steam account linking
-- [ ] Steam trade delivery flow
-- [ ] Auth / profile / reputation
-- [ ] Admin / moderation / dispute flow
-- [ ] Security review
-- [ ] Observability / logging / abuse protection
+Что планируем делать дальше:
+- Real RPC-based payment validation
+- Listing flow for user-owned items
+- Sell-side dashboard and my listings
+- Purchase history / trade history / payment history
+- Custody / escrow flow for item delivery
+- Admin panel for operations and dispute handling
+- Market price layer beyond Steam reference prices
+- Seller payout flow
+- Security review and production hardening
 
 ## Позиционирование для review
 
