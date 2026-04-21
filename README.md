@@ -1,31 +1,33 @@
-# Arc Steam Marketplace MVP
+# Arc Steam Marketplace Beta
 
-MVP for a cs.money-like Steam items marketplace with Arc-native USDC settlement.
+Beta build of a CS2 skins marketplace with **Arc-native USDC settlement**, **Steam account verification**, **inventory sync**, and an early **wallet-native payment flow**.
 
-## Included in this first scaffold
-- Next.js app router project
-- Prisma schema
-- Landing page
-- Marketplace page
-- Listing detail page
-- Sell page scaffold
-- Dashboard scaffold
-- Admin summary page
-- API routes for listings and orders
+## Current build
+- ARC wallet connect
+- Correct Arc Testnet wallet network configuration
+- Steam OpenID account connection
+- Steam trade-link verification
+- Steam inventory sync into the site
+- Steam price visibility in inventory and marketplace
+- Group / ungroup inventory mode for cases
+- Inventory value estimation
+- Initial buyer-signed USDC payment flow
+- Profile-based restrictions for trading actions
 
 ## Main idea
-- Wallet-native auth layer
-- Steam items listed inside the site
-- Buyers pay in Arc USDC
-- Orders are created on-site
-- Delivery happens offchain via Steam trade
-- Payouts happen after fulfillment
+- Wallet-native user flow instead of mandatory pre-funded internal balances
+- Steam identity and trade-link verification before sensitive trading actions
+- Steam items surfaced directly inside the site
+- Buyers sign payments from their wallet in Arc USDC
+- Delivery happens offchain through Steam trade / future custody flow
+- Onchain settlement plus offchain item execution
 
-## Next steps
-1. Add wallet connect
-2. Add real form actions for create listing / buy item
-3. Add auth/session model
-4. Add admin order actions
-5. Add payout workflow
-6. Add trade hold tracking
-7. Replace SQLite with Postgres
+## Planned next
+1. Add real RPC-based payment validation
+2. Implement listing flow for user-owned Steam items
+3. Add sell-side dashboard (my listings / my sales / payment history)
+4. Build custody / escrow flow for item delivery
+5. Add admin operations panel and dispute handling
+6. Add market price layer beyond Steam reference prices
+7. Add seller payout flow
+8. Harden security, monitoring, and abuse protection
