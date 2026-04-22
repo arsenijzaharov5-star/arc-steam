@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS profile (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   steam_id TEXT,
   steam_name TEXT,
+  steam_avatar TEXT,
   steam_trade_link TEXT,
   trade_link_verified INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL
@@ -126,5 +127,9 @@ function seedTicksForMissingInstruments() {
 
   tx();
 }
+
+try {
+  db.exec("ALTER TABLE profile ADD COLUMN steam_avatar TEXT");
+} catch {}
 
 seedTicksForMissingInstruments();

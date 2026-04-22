@@ -20,6 +20,8 @@ const minPriceEl = document.getElementById("min-price");
 const maxPriceEl = document.getElementById("max-price");
 const inventorySearchEl = document.getElementById("inventory-search");
 const inventoryGridEl = document.getElementById("inventory-grid");
+const inventoryGroupToggleEl = document.getElementById("inventory-group-toggle");
+const inventoryTotalEl = document.getElementById("inventory-total");
 const typeChipEls = Array.from(document.querySelectorAll(".chip[data-type]"));
 const navBtnEls = Array.from(document.querySelectorAll(".nav-btn[data-view]"));
 const sortBtnEls = Array.from(document.querySelectorAll(".sort-btn[data-sort]"));
@@ -48,6 +50,9 @@ const profileTradeLinkEl = document.getElementById("profile-trade-link");
 const profileSaveBtnEl = document.getElementById("profile-save-btn");
 const profileConnectSteamBtnEl = document.getElementById("profile-connect-steam-btn");
 const profileStatusEl = document.getElementById("profile-status");
+const profileHeroNameEl = document.getElementById("profile-hero-name");
+const profileHeroSubtitleEl = document.getElementById("profile-hero-subtitle");
+const profileAvatarEl = document.getElementById("profile-avatar");
 const profileWalletStateEl = document.getElementById("profile-wallet-state");
 const profileSteamStateEl = document.getElementById("profile-steam-state");
 const profileTradeStateEl = document.getElementById("profile-trade-state");
@@ -70,6 +75,9 @@ let currentSort = "popular";
 let marketRenderLimit = 48;
 let profileState = null;
 let currentPurchaseOrder = null;
+let steamInventory = [];
+let inventoryGrouped = true;
+const steamPriceCatalog = new Map();
 
 function persistWallet(address) {
   try {
@@ -108,6 +116,19 @@ function isTradeVerified() {
 }
 
 function updateProfileSummary() {
+  if (profileHeroNameEl) {
+    profileHeroNameEl.textContent = profileState?.steamName || "Steam not connected";
+  }
+  if (profileHeroSubtitleEl) {
+    profileHeroSubtitleEl.textContent = profileState?.steamId ? "Steam connected and ready for trading." : "Connect Steam to unlock inventory sync and trading actions.";
+  }
+  if (profileAvatarEl) {
+    if (profileState?.steamAvatar) {
+      profileAvatarEl.innerHTML = `<img src="${profileState.steamAvatar}" alt="Steam avatar" class="profile-avatar-image" />`;
+    } else {
+      profileAvatarEl.textContent = (profileState?.steamName || "S").slice(0,1).toUpperCase();
+    }
+  }
   if (profileWalletStateEl) {
     profileWalletStateEl.textContent = connectedWallet ? `${connectedWallet.slice(0, 6)}...${connectedWallet.slice(-4)}` : "Not connected";
   }
@@ -127,7 +148,16 @@ function updateProfileSummary() {
   }
 }
 
-async function loadProfile() {
+async function loadSteamInventory() {
+  if (!profileState?.steamId) {
+    steamInventory = [];
+    return;
+  }
+  steamInventory = await api.get("/api/steam/inventory").catch(() => []);
+}
+
+async function loadProfile(options = {}) {
+  const { withInventory = false, withHistory = true } = options;
   profileState = await api.get("/api/profile").catch(() => null);
   if (profileState?.steamId && !profileState?.steamName) {
     profileState.steamName = `Steam ${profileState.steamId.slice(-6)}`;
@@ -135,7 +165,10 @@ async function loadProfile() {
   if (profileSteamIdEl) profileSteamIdEl.value = profileState?.steamId || "";
   if (profileSteamNameEl) profileSteamNameEl.value = profileState?.steamName || "";
   if (profileTradeLinkEl) profileTradeLinkEl.value = profileState?.steamTradeLink || "";
-  if (profileHistoryEl) {
+  if (withInventory) {
+    await loadSteamInventory();
+  }
+  if (withHistory && profileHistoryEl) {
     const orders = await api.get("/api/orders?limit=8").catch(() => []);
     profileHistoryEl.innerHTML = orders.length
       ? orders.map((order) => `${order.symbol} · ${order.side} · ${fmt(order.price)} USDC · ${order.status}`).join("<br />")
@@ -242,6 +275,36 @@ function itemKey(item) {
 function visibleMarketSlice(items) {
   if (!items.length) return [];
   return items.slice(0, Math.min(marketRenderLimit, items.length));
+}
+
+async function ensureSteamPricesForItems(items) {
+  const uniqueNames = Array.from(new Set((items || []).map((item) => item.marketHashName || item.name).filter(Boolean)));
+  const missing = uniqueNames.filter((name) => !steamPriceCatalog.has(name));
+  const batch = missing.slice(0, 120);
+  await Promise.all(batch.map(async (marketHashName) => {
+    try {
+      const data = await api.get(`/api/steam/price?marketHashName=${encodeURIComponent(marketHashName)}`);
+      steamPriceCatalog.set(marketHashName, data);
+    } catch {
+      steamPriceCatalog.set(marketHashName, { marketHashName, steamPrice: "—", priceUsdc: 0 });
+    }
+  }));
+}
+
+function parseSteamPriceValue(value) {
+  if (!value) return 0;
+  const cleaned = String(value).replace(/[^0-9.,]/g, "").replace(/,/g, ".");
+  const match = cleaned.match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+
+function attachSteamPrices(items) {
+  return (items || []).map((item) => {
+    const key = item.marketHashName || item.name;
+    const steam = steamPriceCatalog.get(key);
+    if (!steam) return item;
+    return { ...item, steamPrice: steam.steamPrice, priceUsdc: steam.priceUsdc || parseSteamPriceValue(steam.steamPrice) || item.priceUsdc || 0 };
+  });
 }
 
 async function loadFeaturedCatalog() {
@@ -357,15 +420,32 @@ function filteredItems() {
 
 function inventoryItems() {
   const q = (inventorySearchEl?.value || "").trim().toLowerCase();
-  const states = ["in inventory", "listed", "in escrow"];
-  const inventorySource = fullCatalogLoaded
-    ? catalogItems
-    : (featuredByType.skin?.length ? featuredByType.skin : activeCatalogSource());
-  const sample = visibleMarketSlice(sortItems(inventorySource))
-    .slice(0, INVENTORY_LIMIT)
-    .map((item, idx) => ({ ...item, inventoryStatus: states[idx % states.length] }));
+  const source = Array.isArray(steamInventory) && steamInventory.length ? steamInventory.filter((item) => item.tradable !== false) : [];
+  let items = source;
 
-  return sample.filter((item) => {
+  if (inventoryGrouped) {
+    const grouped = [];
+    const caseGroups = new Map();
+
+    for (const item of source) {
+      if (item.type === "case") {
+        const key = item.marketHashName || item.name;
+        if (!caseGroups.has(key)) {
+          caseGroups.set(key, { ...item, quantity: 1, groupedIds: [item.id] });
+        } else {
+          const current = caseGroups.get(key);
+          current.quantity += 1;
+          current.groupedIds.push(item.id);
+        }
+        continue;
+      }
+      grouped.push(item);
+    }
+
+    items = [...grouped, ...Array.from(caseGroups.values()).map((item) => ({ ...item, name: `${item.name} ×${item.quantity}` }))];
+  }
+
+  return items.filter((item) => {
     if (!q) return true;
     return `${item.name} ${item.weapon} ${item.type} ${item.inventoryStatus}`.toLowerCase().includes(q);
   });
@@ -428,26 +508,19 @@ function itemCardHtml(item, context = "market") {
     : `${item.wear} · Seller: ${item.seller}`;
   const actions = owned ? inventoryActions(item) : marketActions(item);
   const imageClass = imageClassForItem(item);
+  const rarityColor = item?.rarity?.color || cardAccent(item.type);
 
   return `
-    <article class="skin-card" data-item-id="${item.id}" data-context="${context}">
-      <div class="skin-thumb skin-thumb--${item.type}" style="background: radial-gradient(circle at top, ${cardAccent(item.type)}55, transparent 45%), linear-gradient(135deg, #341827, #1c1220);">
+    <article class="skin-card overlay-card" style="--card-rarity:${rarityColor}" data-item-id="${item.id}" data-context="${context}">
+      <div class="skin-thumb skin-thumb--${item.type}" style="background: radial-gradient(circle at top, ${rarityColor}44, transparent 45%), linear-gradient(180deg, color-mix(in srgb, ${rarityColor} 18%, #1c2129 82%), #131820);">
         <img src="${item.image || fallbackImage(item)}" alt="${item.name}" class="skin-thumb-image ${imageClass}" loading="lazy" referrerpolicy="no-referrer" decoding="async" />
-      </div>
-      <div class="skin-body">
-        <div class="skin-name">${item.name}</div>
-        <div class="skin-meta">
-          ${labelForType(item.type)} · ${item.weapon}<br />
-          ${sellerLine}
+        <div class="card-overlay"></div>
+        <div class="card-info-overlay">
+          <div class="skin-mini-meta">${item.wear || "—"}${owned ? ` · ${item.quantity ? `${item.quantity} items` : "Owned"}` : ""}</div>
+          <div class="skin-price">${item.steamPrice && item.steamPrice !== "—" ? item.steamPrice : (item.priceUsdc ? `${fmt(item.priceUsdc)} USD` : "Price unavailable")}</div>
+          <div class="skin-name overlay-name">${item.name}</div>
         </div>
-        <div class="skin-price-row">
-          <div class="skin-price">${fmt(item.priceUsdc)} USDC</div>
-          <div class="skin-tag">${owned ? "Owned" : labelForType(item.type)}</div>
-        </div>
-        <div class="skin-rarity-row">${rarityBadge(item)}</div>
-        <div class="skin-actions${owned ? " inventory-actions" : ""}">
-          ${actions}
-        </div>
+        ${!owned ? `<button class="hover-buy-btn" data-action="buy" data-id="${item.id}">Buy now</button>` : `<button class="hover-buy-btn inventory-hover-btn" data-action="list" data-id="${item.id}">List item</button>`}
       </div>
     </article>
   `;
@@ -479,7 +552,7 @@ function bindItemCards(root, items) {
 }
 
 function renderListings(items) {
-  const visibleItems = visibleMarketSlice(items);
+  const visibleItems = visibleMarketSlice(attachSteamPrices(items));
 
   if (!visibleItems.length) {
     skinsGridEl.innerHTML = `
@@ -497,7 +570,14 @@ function renderListings(items) {
 }
 
 function renderInventory() {
-  const items = inventoryItems();
+  const items = attachSteamPrices(inventoryItems());
+  if (inventoryGroupToggleEl) {
+    inventoryGroupToggleEl.textContent = `Grouped: ${inventoryGrouped ? "ON" : "OFF"}`;
+  }
+  if (inventoryTotalEl) {
+    const total = items.reduce((sum, item) => sum + ((Number(item.priceUsdc || 0) || parseSteamPriceValue(item.steamPrice)) * Number(item.quantity || 1)), 0);
+    inventoryTotalEl.textContent = `Inventory value: ${total > 0 ? `${fmt(total)} USD` : "—"}`;
+  }
   inventoryGridEl.innerHTML = items.map((item) => itemCardHtml(item, "inventory")).join("");
   bindItemCards(inventoryGridEl, items);
   return items;
@@ -519,9 +599,10 @@ function renderSelectedItem() {
 
   selectedNameEl.textContent = selectedItem.name;
   selectedMetaEl.innerHTML = `
-    ${fmt(selectedItem.priceUsdc)} USDC · ${labelForType(selectedItem.type)}<br />
-    ${selectedItem.weapon} · ${selectedItem.wear}<br />
+    Steam price: ${selectedItem.steamPrice || "—"} · Market price: ${selectedItem.marketPrice || "—"}<br />
+    ${labelForType(selectedItem.type)} · ${selectedItem.weapon} · ${selectedItem.wear}<br />
     Category: ${selectedItem.category || "Item"} · ${selectedItem.pattern || "No pattern"}<br />
+    ${selectedItem.quantity ? `Quantity: ${selectedItem.quantity}<br />` : ""}
     ${sellerOrStatus}<br />
     ${rarityBadge(selectedItem)}
   `;
@@ -548,6 +629,7 @@ function renderSelectedItem() {
 }
 
 function openTradeModal(mode, item) {
+  tradeModalEl.hidden = false;
   currentPurchaseOrder = null;
   if (paymentStatusEl) paymentStatusEl.textContent = "No payment created yet.";
   const tradingModes = ["buy", "offer", "list", "delist", "withdraw"];
@@ -595,15 +677,18 @@ function openTradeModal(mode, item) {
 
 function closeTradeModal() {
   tradeModalEl.classList.add("hidden-view");
+  tradeModalEl.hidden = true;
   modalItem = null;
 }
 
 function openWalletModal() {
+  walletModalEl.hidden = false;
   walletModalEl.classList.remove("hidden-view");
 }
 
 function closeWalletModal() {
   walletModalEl.classList.add("hidden-view");
+  walletModalEl.hidden = true;
 }
 
 function setWalletStatus(text, connected = false) {
@@ -682,16 +767,25 @@ async function connectArcWallet() {
 function switchView(view) {
   currentView = view;
   navBtnEls.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
-  marketViewEl.classList.toggle("hidden-view", view !== "market");
-  inventoryViewEl.classList.toggle("hidden-view", view !== "inventory");
-  profileViewEl?.classList.toggle("hidden-view", view !== "profile");
+
+  [marketViewEl, inventoryViewEl, profileViewEl].filter(Boolean).forEach((el) => {
+    el.classList.add("hidden-view");
+    el.hidden = true;
+  });
 
   if (view === "inventory") {
+    inventoryViewEl.hidden = false;
+    inventoryViewEl.classList.remove("hidden-view");
     renderInventory();
+  } else if (view === "profile") {
+    profileViewEl.hidden = false;
+    profileViewEl.classList.remove("hidden-view");
+    loadProfile({ withInventory: false, withHistory: true });
+  } else {
+    marketViewEl.hidden = false;
+    marketViewEl.classList.remove("hidden-view");
   }
-  if (view === "profile") {
-    loadProfile();
-  }
+
   renderSelectedItem();
 }
 
@@ -752,6 +846,22 @@ searchInputEl?.addEventListener("input", () => refreshCatalog(true));
 minPriceEl?.addEventListener("input", () => refreshCatalog(true));
 maxPriceEl?.addEventListener("input", () => refreshCatalog(true));
 inventorySearchEl?.addEventListener("input", renderInventory);
+navBtnEls.forEach((btn) => {
+  if (btn.dataset.view === "inventory") {
+    btn.addEventListener("click", async () => {
+      if (!steamInventory.length && profileState?.steamId) {
+        inventoryGridEl.innerHTML = '<div class="empty-state panel">Loading Steam inventory...</div>';
+        await loadSteamInventory();
+        await ensureSteamPricesForItems(steamInventory);
+        renderInventory();
+      }
+    });
+  }
+});
+inventoryGroupToggleEl?.addEventListener("click", () => {
+  inventoryGrouped = !inventoryGrouped;
+  renderInventory();
+});
 connectWalletBtnEl?.addEventListener("click", openWalletModal);
 walletConnectMetaMaskEl?.addEventListener("click", connectArcWallet);
 loadMoreBtnEl?.addEventListener("click", async () => {
@@ -863,10 +973,20 @@ if (restoredWallet) {
   connectWalletBtnEl.textContent = "ARC Wallet connected";
 }
 
+marketViewEl.classList.add("hidden-view");
+marketViewEl.hidden = true;
+inventoryViewEl.classList.add("hidden-view");
+inventoryViewEl.hidden = true;
+profileViewEl?.classList.add("hidden-view");
+if (profileViewEl) profileViewEl.hidden = true;
+closeTradeModal();
+closeWalletModal();
+
 bindDetailActions();
 await loadFeaturedCatalog();
 await refreshAccount();
-await loadProfile();
+await loadProfile({ withInventory: false, withHistory: false });
+await ensureSteamPricesForItems(catalogItems);
 await refreshCatalog(true);
 updateProfileSummary();
-switchView(window.location.hash === "#profile-view" ? "profile" : currentView);
+switchView(window.location.hash === "#profile-view" ? "profile" : "market");

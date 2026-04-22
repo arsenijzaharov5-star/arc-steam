@@ -48,9 +48,24 @@ function partnerToSteamId64(partner: string) {
 }
 
 function getProfile() {
-  return db.prepare("SELECT id, steam_id as steamId, steam_name as steamName, steam_trade_link as steamTradeLink, trade_link_verified as tradeLinkVerified, updated_at as updatedAt FROM profile WHERE id = 1").get() as
-    | { steamId: string | null; steamName: string | null; steamTradeLink: string | null; tradeLinkVerified: number; updatedAt: string }
+  return db.prepare("SELECT id, steam_id as steamId, steam_name as steamName, steam_avatar as steamAvatar, steam_trade_link as steamTradeLink, trade_link_verified as tradeLinkVerified, updated_at as updatedAt FROM profile WHERE id = 1").get() as
+    | { steamId: string | null; steamName: string | null; steamAvatar: string | null; steamTradeLink: string | null; tradeLinkVerified: number; updatedAt: string }
     | undefined;
+}
+
+async function fetchSteamProfileSummary(steamId: string) {
+  try {
+    const response = await fetch(`https://steamcommunity.com/profiles/${steamId}?xml=1`, {
+      headers: { "user-agent": "Mozilla/5.0" }
+    });
+    if (!response.ok) return null;
+    const xml = await response.text();
+    const name = xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/)?.[1] || xml.match(/<steamID>(.*?)<\/steamID>/)?.[1] || null;
+    const avatar = xml.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/)?.[1] || xml.match(/<avatarFull>(.*?)<\/avatarFull>/)?.[1] || null;
+    return { steamName: name, steamAvatar: avatar };
+  } catch {
+    return null;
+  }
 }
 
 function isVerifiedProfile() {
@@ -68,21 +83,23 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function saveSteamIdentity(steamId: string, steamName?: string | null) {
+function saveSteamIdentity(steamId: string, steamName?: string | null, steamAvatar?: string | null) {
   const existing = getProfile();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO profile (id, steam_id, steam_name, steam_trade_link, trade_link_verified, updated_at)
-     VALUES (1, ?, ?, ?, ?, ?)
+    `INSERT INTO profile (id, steam_id, steam_name, steam_avatar, steam_trade_link, trade_link_verified, updated_at)
+     VALUES (1, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        steam_id = excluded.steam_id,
        steam_name = excluded.steam_name,
+       steam_avatar = excluded.steam_avatar,
        steam_trade_link = excluded.steam_trade_link,
        trade_link_verified = excluded.trade_link_verified,
        updated_at = excluded.updated_at`
   ).run(
     steamId,
     steamName ?? existing?.steamName ?? null,
+    steamAvatar ?? existing?.steamAvatar ?? null,
     existing?.steamTradeLink ?? null,
     existing?.tradeLinkVerified ?? 0,
     now
@@ -137,7 +154,9 @@ app.get("/auth/steam/return", async (req, res) => {
       return res.redirect("/?steam=invalid#profile-view");
     }
 
-    saveSteamIdentity(match[1], getProfile()?.steamName ?? null);
+    const steamId = match[1];
+    const summary = await fetchSteamProfileSummary(steamId);
+    saveSteamIdentity(steamId, summary?.steamName ?? getProfile()?.steamName ?? null, summary?.steamAvatar ?? getProfile()?.steamAvatar ?? null);
     return res.redirect("/?steam=connected#profile-view");
   } catch {
     return res.redirect("/?steam=error#profile-view");
@@ -152,10 +171,19 @@ app.get("/api/account", (_req, res) => {
   res.json(getAccountSnapshot());
 });
 
-app.get("/api/profile", (_req, res) => {
+app.get("/api/profile", async (_req, res) => {
+  const profile = getProfile();
+  if (profile?.steamId && (!profile.steamAvatar || !profile.steamName || String(profile.steamName).startsWith('Steam '))) {
+    const summary = await fetchSteamProfileSummary(profile.steamId);
+    if (summary?.steamName || summary?.steamAvatar) {
+      saveSteamIdentity(profile.steamId, summary?.steamName ?? profile.steamName, summary?.steamAvatar ?? profile.steamAvatar);
+    }
+  }
+
   res.json(getProfile() ?? {
     steamId: null,
     steamName: null,
+    steamAvatar: null,
     steamTradeLink: null,
     tradeLinkVerified: 0,
     updatedAt: null
@@ -216,6 +244,128 @@ app.get("/api/purchase-orders", (_req, res) => {
      LIMIT 20`
   ).all();
   res.json(rows);
+});
+
+const steamPriceCache = new Map<string, { value: string; ts: number }>();
+
+function parseSteamPriceToNumber(price?: string) {
+  if (!price) return 0;
+  const cleaned = price.replace(/[^0-9.,]/g, "").replace(/,/g, ".");
+  const match = cleaned.match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+
+async function fetchSteamPrice(marketHashName: string) {
+  const cached = steamPriceCache.get(marketHashName);
+  if (cached && Date.now() - cached.ts < 10 * 60_000) return cached.value;
+
+  const url = `https://steamcommunity.com/market/priceoverview/?currency=1&appid=730&market_hash_name=${encodeURIComponent(marketHashName)}`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "accept": "application/json, text/plain, */*",
+        "user-agent": "Mozilla/5.0"
+      }
+    });
+    if (!response.ok) return "—";
+    const data = await response.json() as any;
+    const value = data?.lowest_price || data?.median_price || "—";
+    steamPriceCache.set(marketHashName, { value, ts: Date.now() });
+    return value;
+  } catch {
+    return "—";
+  }
+}
+
+app.get("/api/steam/price", async (req, res) => {
+  const marketHashName = String(req.query.marketHashName || "").trim();
+  if (!marketHashName) {
+    return res.status(400).json({ error: "marketHashName is required" });
+  }
+  const steamPrice = await fetchSteamPrice(marketHashName);
+  return res.json({ marketHashName, steamPrice, priceUsdc: parseSteamPriceToNumber(steamPrice) });
+});
+
+app.get("/api/steam/inventory", async (_req, res) => {
+  const profile = getProfile();
+  if (!profile?.steamId) {
+    return res.status(400).json({ error: "Steam is not connected" });
+  }
+
+  const appId = 730;
+  const contextId = 2;
+  const allAssets: any[] = [];
+  const allDescriptions: any[] = [];
+  let startAssetId: string | undefined;
+
+  try {
+    for (let page = 0; page < 10; page += 1) {
+      const url = `https://steamcommunity.com/inventory/${profile.steamId}/${appId}/${contextId}?l=english&count=200${startAssetId ? `&start_assetid=${startAssetId}` : ""}`;
+      const response = await fetch(url, {
+        headers: {
+          "accept": "application/json, text/plain, */*",
+          "user-agent": "Mozilla/5.0"
+        }
+      });
+      if (!response.ok) {
+        return res.status(502).json({ error: `Steam inventory fetch failed with ${response.status}` });
+      }
+      const data = await response.json() as any;
+      allAssets.push(...(Array.isArray(data.assets) ? data.assets : []));
+      allDescriptions.push(...(Array.isArray(data.descriptions) ? data.descriptions : []));
+      if (!data.more_items || !data.last_assetid) break;
+      startAssetId = String(data.last_assetid);
+    }
+
+    const descMap = new Map(allDescriptions.map((d: any) => [`${d.classid}_${d.instanceid}`, d]));
+    const marketNames = Array.from(new Set(allAssets.map((asset: any, idx: number) => {
+      const desc = descMap.get(`${asset.classid}_${asset.instanceid}`) || {};
+      return desc.market_hash_name || desc.name || `CS2 Item ${idx + 1}`;
+    })));
+    const priceEntries = await Promise.all(marketNames.map(async (name) => [name, await fetchSteamPrice(name)] as const));
+    const priceMap = new Map(priceEntries);
+
+    const items = allAssets.map((asset: any, idx: number) => {
+      const desc = descMap.get(`${asset.classid}_${asset.instanceid}`) || {};
+      const marketName = desc.market_hash_name || desc.name || `CS2 Item ${idx + 1}`;
+      const tags = Array.isArray(desc.tags) ? desc.tags : [];
+      const exterior = tags.find((t: any) => t.category === "Exterior")?.localized_tag_name || "—";
+      const weapon = marketName.includes("|") ? marketName.split("|")[0].trim() : (tags.find((t: any) => t.category === "Weapon")?.localized_tag_name || "CS2 item");
+      const type = tags.find((t: any) => t.category === "Type")?.localized_tag_name || "Item";
+      const rarity = tags.find((t: any) => t.category === "Rarity");
+      const steamPrice = priceMap.get(marketName) || "—";
+      const ownerDescriptions = Array.isArray(desc.owner_descriptions) ? desc.owner_descriptions : [];
+      const fraudWarnings = Array.isArray(desc.fraudwarnings) ? desc.fraudwarnings : [];
+      const allFlags = `${ownerDescriptions.map((x: any) => x.value || '').join(' ')} ${fraudWarnings.join(' ')}`.toLowerCase();
+      const tradableFlag = Number(desc.tradable ?? 1) === 1;
+      const marketableFlag = Number(desc.marketable ?? 1) === 1;
+      const permanentlyBound = /non[- ]?tradable|cannot be traded|not tradable|cannot be listed|commodity not marketable|cannot be marketed/.test(allFlags);
+      const tradeable = tradableFlag && marketableFlag && !permanentlyBound;
+      return {
+        id: `${asset.assetid}`,
+        assetId: asset.assetid,
+        classId: asset.classid,
+        marketHashName: marketName,
+        name: marketName,
+        weapon,
+        wear: exterior,
+        type: /knife/i.test(type) ? "knife" : /glove/i.test(type) ? "gloves" : /sticker/i.test(type) ? "sticker" : /case|container/i.test(type) ? "case" : "skin",
+        category: type,
+        seller: profile.steamName || "You",
+        inventoryStatus: "in inventory",
+        image: desc.icon_url ? `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}/360fx360f` : undefined,
+        rarity: rarity ? { name: rarity.localized_tag_name, color: rarity.color ? `#${rarity.color}` : "#ff8fb1" } : { name: "Steam item", color: "#ff8fb1" },
+        steamPrice,
+        marketPrice: "—",
+        priceUsdc: parseSteamPriceToNumber(steamPrice),
+        tradable: tradeable
+      };
+    });
+
+    return res.json(items);
+  } catch (error: any) {
+    return res.status(502).json({ error: error?.message || "Steam inventory fetch failed" });
+  }
 });
 
 const createPurchaseSchema = z.object({

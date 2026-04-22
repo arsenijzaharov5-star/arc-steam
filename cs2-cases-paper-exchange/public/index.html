@@ -63,40 +63,20 @@
               <input id="max-price" type="number" value="5000" step="1" min="0" />
             </div>
           </div>
+
+          <div class="filter-group">
+            <div class="group-title">Sort by</div>
+            <div class="chips sort-chips">
+              <button class="sort-btn active" data-sort="popular">Popular</button>
+              <button class="sort-btn" data-sort="price-asc">Low → High</button>
+              <button class="sort-btn" data-sort="price-desc">High → Low</button>
+              <button class="sort-btn" data-sort="name">Name</button>
+            </div>
+          </div>
         </aside>
 
         <section class="market-area">
-          <section class="hero panel">
-            <div>
-              <div class="top-label">p2p skins marketplace</div>
-              <h1 id="market-title">CS2 skins marketplace</h1>
-              <p id="market-subtitle">
-                Search-first storefront for CS2 items with demo listings, offer flow, and ARC-ready settlement UX.
-              </p>
-            </div>
-            <div class="hero-stats">
-              <div class="stat-box">
-                <span>Active listings</span>
-                <strong id="active-count">—</strong>
-              </div>
-              <div class="stat-box">
-                <span>Demo floor</span>
-                <strong id="floor-price">—</strong>
-              </div>
-              <div class="stat-box">
-                <span>Settlement</span>
-                <strong>ARC / USDC</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="toolbar-row panel">
-            <div class="toolbar-left">
-              <button class="sort-btn active" data-sort="popular">Popular</button>
-              <button class="sort-btn" data-sort="price-asc">Price: Low to High</button>
-              <button class="sort-btn" data-sort="price-desc">Price: High to Low</button>
-              <button class="sort-btn" data-sort="name">Name</button>
-            </div>
+          <section class="toolbar-row panel compact-toolbar">
             <div class="toolbar-meta">
               <span id="results-count">— results</span>
               <span id="results-note">Showing curated storefront slice</span>
@@ -150,7 +130,9 @@
           </div>
           <div class="inventory-toolbar">
             <input id="inventory-search" type="text" placeholder="Search inventory" />
+            <button id="inventory-group-toggle" class="secondary-btn" type="button">Grouped: ON</button>
           </div>
+          <div id="inventory-total" class="selected-meta">Inventory value: —</div>
           <section id="inventory-grid" class="skins-grid"></section>
         </div>
       </section>
@@ -164,46 +146,46 @@
             </div>
           </div>
 
-          <div class="profile-grid">
+          <div class="panel profile-hero-card">
+            <div class="profile-hero-avatar" id="profile-avatar">S</div>
+            <div>
+              <div class="selected-name" id="profile-hero-name">Steam not connected</div>
+              <div class="selected-meta" id="profile-hero-subtitle">Connect Steam to unlock inventory sync and trading actions.</div>
+            </div>
+            <button id="profile-connect-steam-btn" class="primary-btn">Connect Steam</button>
+          </div>
+
+          <div class="profile-grid profile-two-up">
             <div class="panel profile-card">
-              <div class="selected-name">Steam identity</div>
-              <div class="selected-meta">Connect Steam through OpenID like standard CS2 skin sites, then verify your trade link before buying or selling.</div>
-
-              <button id="profile-connect-steam-btn" class="primary-btn">Connect Steam</button>
-
-              <label class="field">
-                <span>Steam ID64</span>
-                <input id="profile-steam-id" type="text" placeholder="7656119..." readonly />
-              </label>
-
+              <div class="selected-name">Trade link</div>
+              <div class="selected-meta">Attach and verify your Steam trade link before buying or listing items.</div>
               <label class="field">
                 <span>Steam display name</span>
                 <input id="profile-steam-name" type="text" placeholder="Kursoedov" readonly />
               </label>
-
               <label class="field">
                 <span>Steam trade link</span>
                 <input id="profile-trade-link" type="text" placeholder="https://steamcommunity.com/tradeoffer/new/?partner=..." />
               </label>
-
               <button id="profile-save-btn" class="primary-btn">Save and verify</button>
               <div id="profile-status" class="profile-status">Steam profile not verified</div>
             </div>
 
             <div class="panel profile-card">
-              <div class="selected-name">Trading access</div>
+              <div class="selected-name">Wallet & balance</div>
               <div class="deal-summary">
                 <div><span>Wallet</span><strong id="profile-wallet-state">Not connected</strong></div>
                 <div><span>Steam</span><strong id="profile-steam-state">Not connected</strong></div>
                 <div><span>Trade link</span><strong id="profile-trade-state">Not verified</strong></div>
+                <div><span>Balance</span><strong>—</strong></div>
               </div>
-              <div class="selected-meta">Buying and selling stay blocked until the Steam identity and submitted trade link match.</div>
+              <div class="selected-meta">Balance and seller payout logic will appear here as the marketplace settlement flow evolves.</div>
             </div>
+          </div>
 
-            <div class="panel profile-card">
-              <div class="selected-name">History</div>
-              <div id="profile-history" class="selected-meta">No activity loaded yet.</div>
-            </div>
+          <div class="panel profile-card profile-history-card">
+            <div class="selected-name">Purchase & sales history</div>
+            <div id="profile-history" class="selected-meta">No activity loaded yet.</div>
           </div>
         </div>
       </section>

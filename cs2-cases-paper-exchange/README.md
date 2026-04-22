@@ -1,107 +1,107 @@
 # ARC Steam Market — CS2 Marketplace Demo
 
-Демо‑витрина маркетплейса для **покупки и продажи предметов CS2** с прицелом на будущий settlement через **ARC** и газ/расчёты в **USDC**.
+A demo storefront for **buying and selling CS2 items**, designed as a product prototype for future **ARC** settlement and **USDC**-based payments.
 
-Это **не финальный market backend** и не production exchange. Сейчас репозиторий нужен как:
-- продуктовый прототип для review;
-- UI/UX демо будущего маркетплейса;
-- демонстрационный storefront для каталога предметов, карточек, поиска, фильтров и демо‑листингов.
+This is **not** the final market backend and not a production exchange. Right now this repository serves as:
+- a product prototype for review;
+- a UI/UX demo of the future marketplace;
+- a showcase storefront for the item catalog, cards, search, filters, and demo listings.
 
-## Что это сейчас
+## What it is right now
 
-Текущая версия — это **search-first marketplace beta**, где уже есть:
-- каталог предметов CS2;
+The current version is a **search-first marketplace beta** with:
+- a CS2 item catalog;
 - ARC wallet connect;
 - Steam OpenID account connection;
-- верификация Steam trade link;
+- Steam trade-link verification;
 - Steam inventory sync;
-- отображение Steam prices в inventory и marketplace;
-- grouped / ungrouped режим для кейсов в inventory;
-- оценка общей стоимости Steam inventory;
-- базовый buyer-signed payment flow под USDC settlement;
-- ограничения торговых действий через profile + verification gating.
+- Steam price visibility in inventory and marketplace;
+- grouped / ungrouped case mode in inventory;
+- estimated total Steam inventory value;
+- an initial buyer-signed payment flow for USDC settlement;
+- profile-based trading restrictions through verification gating.
 
-## Что внутри репозитория
+## Repository contents
 
 ### Frontend demo
 - `public/index.html`
 - `public/styles.css`
 - `public/app.js`
 
-Там живёт demo storefront:
-- список карточек;
-- карточка выбранного предмета;
-- демо‑блок быстрых действий;
-- служебные dev‑таблицы.
+This is where the demo storefront lives:
+- the item card grid;
+- the selected item flow;
+- quick marketplace actions;
+- development-facing helper blocks.
 
 ### Demo catalog
 - `public/data/items.json`
 
-Каталог предметов для витрины. Сейчас используется как источник данных для интерфейса.
+The item catalog used by the storefront UI.
 
 ### Import scripts
 - `scripts/import_cs2_catalog.py`
 - `scripts/update_steam_prices.py`
 
-Они нужны, чтобы:
-- пересобирать локальный каталог из открытых источников данных по CS2;
-- подтягивать примерные цены из Steam для демо‑версии.
+These are used to:
+- rebuild the local catalog from open CS2 data sources;
+- pull approximate Steam prices for the demo experience.
 
-## Обновление каталога
+## Updating the catalog
 
-### 1. Пересобрать каталог предметов
+### 1. Rebuild the item catalog
 
 ```bash
 python3 scripts/import_cs2_catalog.py
 ```
 
-Что делает:
-- тянет открытые данные по CS2 предметам;
-- собирает `items.json`;
-- сохраняет скины, кейсы, ножи, перчатки и стикеры в storefront‑формате.
+What it does:
+- pulls open CS2 item data;
+- rebuilds `items.json`;
+- stores skins, cases, knives, gloves, and stickers in storefront format.
 
-### 2. Подтянуть примерные цены из Steam
+### 2. Pull approximate Steam prices
 
 ```bash
 python3 scripts/update_steam_prices.py
 ```
 
-Что делает:
-- проходит по `market_hash_name`;
-- тянет `lowest_price / median_price / volume` из Steam Community Market;
-- обновляет цены в каталоге.
+What it does:
+- walks through `market_hash_name` values;
+- pulls `lowest_price / median_price / volume` from Steam Community Market;
+- updates catalog prices.
 
-## Источники данных
+## Data sources
 
-Сейчас демо использует открытые и технически удобные источники:
-- открытый CS2 item dataset / JSON API для названий, типов и image URLs;
-- Steam Community Market для примерных демо‑цен.
+The demo currently uses practical open sources:
+- an open CS2 item dataset / JSON API for names, types, and image URLs;
+- Steam Community Market for approximate reference prices.
 
-## Ограничения текущей версии
+## Current limitations
 
-Важно понимать, что это пока **beta‑слой**, а не завершённый продукт.
+It is important to treat this as a **beta layer**, not a finished product.
 
-Сейчас **ещё нет**:
-- настоящих пользовательских листингов;
-- реального escrow/custody исполнения;
-- полноценной RPC‑валидации onchain оплат;
+What is still missing:
+- real user-generated listings;
+- full escrow / custody execution;
+- complete RPC-based onchain payment validation;
 - seller payout flow;
-- production‑уровня moderation и anti‑abuse;
-- завершённого admin/dispute слоя;
-- onchain settlement через ARC mainnet.
+- production-grade moderation and anti-abuse;
+- a finished admin / dispute layer;
+- ARC mainnet settlement.
 
-## Почему это выглядит именно так
+## Why it looks like this
 
-Мы сознательно ушли от идеи “трейдинг‑терминала” и строим не графиковую биржу, а **маркетплейс предметов**, где главное:
-- быстро найти предмет;
-- увидеть карточку и цену;
-- понять тип ассета;
-- оформить покупку / оффер;
-- дальше перевести это в P2P + escrow + ARC settlement.
+This project is intentionally moving away from a “trading terminal” idea and toward an **item marketplace**, where the main job is to:
+- find an item quickly;
+- see the card and its price;
+- understand the asset type;
+- complete a buy / offer flow;
+- eventually connect that flow to P2P + escrow + ARC settlement.
 
 ## Current build
 
-Что уже внедрено в текущую beta-версию:
+Already implemented in the current beta:
 - ARC wallet connect
 - Steam OpenID account connection
 - Steam trade-link verification
@@ -114,7 +114,7 @@ python3 scripts/update_steam_prices.py
 
 ## Planned next
 
-Что планируем делать дальше:
+Planned next milestones:
 - Real RPC-based payment validation
 - Listing flow for user-owned items
 - Sell-side dashboard and my listings
@@ -125,21 +125,21 @@ python3 scripts/update_steam_prices.py
 - Seller payout flow
 - Security review and production hardening
 
-## Позиционирование для review
+## Positioning for review
 
-Если репозиторий читают люди, которые будут аппрувить проект, то правильно смотреть на него так:
+If the repository is being reviewed by people deciding whether to approve the project, the right framing is:
 
-**Это демонстрационный продуктовый слой будущего CS2 marketplace**, который уже показывает:
-- визуальное направление;
-- структуру каталога предметов;
-- модель карточек и поиска;
-- подход к демо‑данным и рыночным price references;
-- подготовку к ARC + USDC settlement flow.
+**This is the product-layer demo of a future CS2 marketplace**, and it already shows:
+- the visual direction;
+- the structure of the item catalog;
+- the model for cards and search;
+- the approach to demo data and price references;
+- the path toward ARC + USDC settlement.
 
-## Commit policy дальше
+## Commit policy going forward
 
-Дальше имеет смысл держать историю чище:
-- делать **реже, но крупнее** коммиты;
-- писать **смысловые сообщения**, а не микрошаги;
-- по возможности объединять мелкие правки в один логический change set;
-- перед внешними review/release — держать историю аккуратной и читаемой.
+From here it makes sense to keep history cleaner:
+- commit less often, but in larger logical chunks;
+- use meaningful commit messages instead of micro-step messages;
+- combine small edits into coherent change sets when possible;
+- keep history readable before external reviews and releases.
