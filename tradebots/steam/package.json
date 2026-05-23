@@ -1,0 +1,18 @@
+{
+  "name": "@arc/steam-tradebot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Steam trade bot skeleton for ARC CS2 marketplace delivery.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/bot-manager.js && node --check src/config.js && node --check src/order-store.js && node --check src/trade-offer-policy.js && node --check src/adapters/mock-steam-adapter.js && node --check src/adapters/steam-offer-adapter.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "steam-totp": "^2.1.2",
+    "steam-tradeoffer-manager": "^2.12.4",
+    "steam-user": "^5.2.0",
+    "steamcommunity": "^3.49.0"
+  }
+}
