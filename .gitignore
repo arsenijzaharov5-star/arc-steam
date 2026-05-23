@@ -5,3 +5,10 @@ prisma/dev.db*
 
 # local helper docs
 public/images/README.txt
+
+# runtime secrets and generated data
+tradebots/steam/.env
+tradebots/steam/data/*.json
+tradebots/steam/logs/
+data/steamapis-key.txt
+data/steam-price-cache.json
